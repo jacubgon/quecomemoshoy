@@ -29,7 +29,16 @@
         .sheet-handle-wrap{padding:10px 0 0;display:flex;justify-content:center;flex-shrink:0}
         .sheet-handle{width:40px;height:4px;background:#e0d9d0;border-radius:2px}
         .sheet-header{padding:10px 16px 10px;border-bottom:1px solid #f0ece8;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
-        .sheet-scroll{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:14px 16px 40px}
+        
+        /* FIX SCROLL MÓVIL */
+        .sheet-scroll{
+            overflow-y: auto !important;
+            flex: 1;
+            -webkit-overflow-scrolling: touch;
+            padding: 14px 16px 60px; /* Más padding abajo para el teclado */
+            touch-action: pan-y !important;
+            position: relative;
+        }
 
         .place-name{font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.2;padding-right:8px}
         .place-type-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-top:5px}
@@ -41,7 +50,6 @@
         .stars-row{display:flex;align-items:center;gap:10px;margin:4px 0 2px}
         .stars{display:flex;gap:4px}
         .star{font-size:28px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent;transition:transform 0.1s}
-        .star:active{transform:scale(1.3)}
         .star.filled{color:#f39c12}
         .star.empty{color:#e0dbd5}
         .rating-label{font-size:13px;color:#aaa}
@@ -78,10 +86,9 @@
         .map-toast{background:rgba(44,62,80,0.92);color:#fff;border-radius:12px;padding:11px 18px;font-size:14px;position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2000;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.25);pointer-events:none}
 
         /* ADD FORM */
-        .add-form-wrap{padding:4px 16px 40px}
+        .add-form-wrap{padding:4px 0 40px}
         .add-form-wrap label{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;display:block;margin:12px 0 5px}
         .add-form-wrap input,.add-form-wrap select{width:100%;border:1px solid #e0d9d0;border-radius:12px;padding:10px 13px;font-size:15px;font-family:inherit;color:#333;background:#faf8f5;-webkit-appearance:none;appearance:none;outline:none}
-        .add-form-wrap input:focus,.add-form-wrap select:focus{border-color:#aaa;background:#fff}
 
         /* STATS */
         .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
@@ -89,7 +96,6 @@
         .stat-num{font-size:28px;font-weight:800;line-height:1}
         .stat-label{font-size:12px;margin-top:4px;opacity:0.75}
         .visited-item{padding:10px 0;border-bottom:1px solid #f5f0eb;display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:8px}
-        .visited-item:last-child{border-bottom:none}
 
         /* OVERLAY */
         .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:999;display:none}
@@ -200,10 +206,9 @@ function makeIcon(p) {
   const ud = u(p.id);
   const cfg = TYPE_CFG[p.type] || TYPE_CFG.otro;
   const bg = ud.status === 'visitado' ? '#27ae60' : ud.status === 'pendiente' ? '#e67e22' : cfg.color;
-  const starBadge = ud.stars > 0 ? `<div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:#f39c12;color:#fff;border-radius:6px;font-size:9px;font-weight:800;padding:1px 4px;white-space:nowrap;line-height:1.4">${ud.stars}★</div>` : '';
   const html = `<div style="position:relative;width:38px;height:38px">
     <div style="background:${bg};width:38px;height:38px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,0.28)">${cfg.icon}</div>
-    ${starBadge}
+    ${ud.stars > 0 ? `<div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:#f39c12;color:#fff;border-radius:6px;font-size:9px;font-weight:800;padding:1px 4px;white-space:nowrap;line-height:1.4">${ud.stars}★</div>` : ''}
   </div>`;
   return L.divIcon({html, className:'', iconSize:[38,38], iconAnchor:[19,19]});
 }
@@ -236,12 +241,6 @@ function filterBy(f, btn) {
   renderMarkers();
 }
 
-/**
- * ESTA ES LA FUNCIÓN QUE TENÍA EL ERROR. 
- * Ahora se divide en:
- * 1. openSheet (Controlador: busca el sitio por ID o lo recibe directo)
- * 2. renderSheetContent (Lógica: pinta el HTML)
- */
 function openSheet(placeOrId) {
   const place = typeof placeOrId === 'number' ? allPlaces.find(p => p.id === placeOrId) : placeOrId;
   if (!place) return;
@@ -252,6 +251,7 @@ function renderSheetContent(place) {
   currentPlace = place;
   const ud = u(place.id);
   const cfg = TYPE_CFG[place.type] || TYPE_CFG.otro;
+  map.dragging.disable(); // Bloquear mapa al abrir ficha
 
   const starsHtml = [1,2,3,4,5].map(i =>
     `<span class="star ${(ud.stars||0) >= i ? 'filled' : 'empty'}" onclick="setStar(${i})">★</span>`
@@ -262,8 +262,7 @@ function renderSheetContent(place) {
     return `<span class="tag ${active ? 'active' : ''}" onclick="toggleTag('${t.replace(/'/g,"\\'")}',this)">${t}</span>`;
   }).join('');
 
-  const priceLabels = ['€','€€','€€€','€€€€'];
-  const priceHtml = priceLabels.map((l,i) =>
+  const priceHtml = ['€','€€','€€€','€€€€'].map((l,i) =>
     `<button class="price-btn ${(ud.price_quality||0) === i+1 ? 'active' : ''}" onclick="setPrice(${i+1},this)">${l}</button>`
   ).join('');
 
@@ -280,40 +279,21 @@ function renderSheetContent(place) {
       <button class="close-btn" onclick="closeSheet()">✕</button>
     </div>
     <div class="sheet-scroll">
-      ${gRating ? `
-        <div class="google-bar">
-          <span style="font-size:12px;color:#aaa">Google</span>
-          <span class="google-stars">${gStars}</span>
-          <span class="google-num">${gRating}</span>
-          <span class="google-count">(${place.google_count?.toLocaleString('es')})</span>
-        </div>` : ''}
-
+      ${gRating ? `<div class="google-bar"><span style="font-size:12px;color:#aaa">Google</span><span class="google-stars">${gStars}</span><span class="google-num">${gRating}</span><span class="google-count">(${place.google_count?.toLocaleString('es')})</span></div>` : ''}
       <div class="section-title">Mi valoración</div>
-      <div class="stars-row">
-        <div class="stars">${starsHtml}</div>
-        <span class="rating-label" id="star-label">${ud.stars ? ud.stars + ' estrellas' : 'Sin valorar'}</span>
-      </div>
-
+      <div class="stars-row"><div class="stars">${starsHtml}</div><span class="rating-label" id="star-label">${ud.stars ? ud.stars + ' estrellas' : 'Sin valorar'}</span></div>
       <div class="section-title">Estado</div>
       <div class="status-row">
         <button class="status-btn ${ud.status === 'visitado' ? 'active-visited' : ''}" onclick="setStatus('visitado',this)">✅ Ya he ido</button>
         <button class="status-btn ${ud.status === 'pendiente' ? 'active-pending' : ''}" onclick="setStatus('pendiente',this)">⭐ Quiero ir</button>
       </div>
-
-      <div class="section-title">Precio</div>
-      <div class="price-row">${priceHtml}</div>
-
-      <div class="section-title">Etiquetas</div>
-      <div class="tag-row">${tagsHtml}</div>
-
-      <div class="section-title">Mis notas</div>
-      <textarea class="notes-input" id="notes-input" placeholder="Ej: Buenísimo el jamón...">${ud.notes || ''}</textarea>
-
+      <div class="section-title">Precio</div><div class="price-row">${priceHtml}</div>
+      <div class="section-title">Etiquetas</div><div class="tag-row">${tagsHtml}</div>
+      <div class="section-title">Mis notas</div><textarea class="notes-input" id="notes-input" placeholder="Ej: Buenísimo el jamón...">${ud.notes || ''}</textarea>
       <button class="save-btn" onclick="savePlace()">💾 Guardar</button>
       ${place.custom ? `<button class="save-btn" style="background:#e74c3c;margin-top:8px" onclick="deletePlace(${place.id})">🗑️ Eliminar</button>` : ''}
     </div>
   `;
-
   document.getElementById('sheet').classList.add('open');
   document.getElementById('overlay').classList.add('show');
 }
@@ -322,58 +302,14 @@ function closeSheet() {
   document.getElementById('sheet').classList.remove('open');
   document.getElementById('overlay').classList.remove('show');
   currentPlace = null;
-}
-
-function setStar(n) {
-  if (!currentPlace) return;
-  userData[currentPlace.id] = {...u(currentPlace.id), stars: n};
-  document.querySelectorAll('.star').forEach((s, i) => {
-    s.className = 'star ' + (i < n ? 'filled' : 'empty');
-  });
-  document.getElementById('star-label').textContent = n + ' estrellas';
-}
-
-function setStatus(s, btn) {
-  if (!currentPlace) return;
-  const already = u(currentPlace.id).status === s;
-  userData[currentPlace.id] = {...u(currentPlace.id), status: already ? null : s};
-  document.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
-  if (!already) btn.className = 'status-btn ' + (s === 'visitado' ? 'active-visited' : 'active-pending');
-}
-
-function setPrice(n, btn) {
-  if (!currentPlace) return;
-  userData[currentPlace.id] = {...u(currentPlace.id), price_quality: n};
-  document.querySelectorAll('.price-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-}
-
-function toggleTag(tag, el) {
-  if (!currentPlace) return;
-  const tags = [...(u(currentPlace.id).tags || [])];
-  const idx = tags.indexOf(tag);
-  if (idx > -1) tags.splice(idx, 1); else tags.push(tag);
-  userData[currentPlace.id] = {...u(currentPlace.id), tags};
-  el.classList.toggle('active');
+  map.dragging.enable(); // Reactivar mapa al cerrar
 }
 
 function savePlace() {
   if (!currentPlace) return;
   const notes = document.getElementById('notes-input').value;
   userData[currentPlace.id] = {...u(currentPlace.id), notes};
-  save();
-  renderMarkers();
-  closeSheet();
-  showToast('¡Guardado!');
-}
-
-function deletePlace(id) {
-  if (!confirm('¿Eliminar este sitio?')) return;
-  customPlaces = customPlaces.filter(p => p.id !== id);
-  allPlaces = allPlaces.filter(p => p.id !== id);
-  save();
-  closeSheet();
-  renderMarkers();
+  save(); renderMarkers(); closeSheet(); showToast('¡Guardado!');
 }
 
 function startAddMode() {
@@ -390,20 +326,17 @@ function onMapClick(e) {
 }
 
 function showAddForm(lat, lng) {
+  map.dragging.disable(); // Bloqueo de mapa para permitir scroll en el form
   const typeOpts = Object.entries(TYPE_CFG).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
   document.getElementById('sheet-content').innerHTML = `
-    <div class="sheet-header">
-      <div><div class="place-name">Añadir sitio</div></div>
-      <button class="close-btn" onclick="closeSheet()">✕</button>
-    </div>
-    <div class="add-form-wrap">
-      <label>Nombre del sitio</label>
-      <input id="new-name" type="text" placeholder="Ej: Casa Morales" autocomplete="off">
-      <label>Tipo</label>
-      <select id="new-type">${typeOpts}</select>
-      <label>Dirección</label>
-      <input id="new-addr" type="text" placeholder="Opcional" autocomplete="off">
-      <button class="save-btn" onclick="confirmAdd(${lat},${lng})">➕ Añadir</button>
+    <div class="sheet-header"><div><div class="place-name">Añadir sitio</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
+    <div class="sheet-scroll">
+      <div class="add-form-wrap">
+        <label>Nombre del sitio</label><input id="new-name" type="text" placeholder="Ej: Casa Morales" autocomplete="off">
+        <label>Tipo</label><select id="new-type">${typeOpts}</select>
+        <label>Dirección</label><input id="new-addr" type="text" placeholder="Opcional" autocomplete="off">
+        <button class="save-btn" onclick="confirmAdd(${lat},${lng})">➕ Añadir</button>
+      </div>
     </div>
   `;
   document.getElementById('sheet').classList.add('open');
@@ -413,15 +346,44 @@ function showAddForm(lat, lng) {
 function confirmAdd(lat, lng) {
   const name = document.getElementById('new-name').value.trim();
   if (!name) return;
-  const type = document.getElementById('new-type').value;
-  const addr = document.getElementById('new-addr').value.trim();
-  const place = {id: nextId++, name, type, lat, lng, address: addr || 'Añadido por ti', custom: true};
-  customPlaces.push(place);
-  allPlaces.push(place);
-  save();
-  closeSheet();
-  renderMarkers();
+  const place = {id: nextId++, name, type: document.getElementById('new-type').value, lat, lng, address: document.getElementById('new-addr').value.trim() || 'Añadido por ti', custom: true};
+  customPlaces.push(place); allPlaces.push(place);
+  save(); renderMarkers(); closeSheet();
   setTimeout(() => openSheet(place), 400);
+}
+
+function setStar(n) {
+  userData[currentPlace.id] = {...u(currentPlace.id), stars: n};
+  document.querySelectorAll('.star').forEach((s, i) => s.className = 'star ' + (i < n ? 'filled' : 'empty'));
+  document.getElementById('star-label').textContent = n + ' estrellas';
+}
+
+function setStatus(s, btn) {
+  const already = u(currentPlace.id).status === s;
+  userData[currentPlace.id] = {...u(currentPlace.id), status: already ? null : s};
+  document.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
+  if (!already) btn.className = 'status-btn ' + (s === 'visitado' ? 'active-visited' : 'active-pending');
+}
+
+function setPrice(n, btn) {
+  userData[currentPlace.id] = {...u(currentPlace.id), price_quality: n};
+  document.querySelectorAll('.price-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function toggleTag(tag, el) {
+  const tags = [...(u(currentPlace.id).tags || [])];
+  const idx = tags.indexOf(tag);
+  if (idx > -1) tags.splice(idx, 1); else tags.push(tag);
+  userData[currentPlace.id] = {...u(currentPlace.id), tags};
+  el.classList.toggle('active');
+}
+
+function deletePlace(id) {
+  if (!confirm('¿Eliminar este sitio?')) return;
+  customPlaces = customPlaces.filter(p => p.id !== id);
+  allPlaces = allPlaces.filter(p => p.id !== id);
+  save(); closeSheet(); renderMarkers();
 }
 
 function goToMyLocation() {
@@ -435,37 +397,24 @@ function goToMyLocation() {
 }
 
 function showStats() {
+  map.dragging.disable();
   const visited = allPlaces.filter(p => u(p.id).status === 'visitado');
   const pending = allPlaces.filter(p => u(p.id).status === 'pendiente');
-
   const visitedList = visited.map(p => {
-    const ud = u(p.id);
-    const cfg = TYPE_CFG[p.type] || TYPE_CFG.otro;
+    const ud = u(p.id); const cfg = TYPE_CFG[p.type] || TYPE_CFG.otro;
     return `<div class="visited-item" onclick="openSheet(${p.id})">
       <span style="font-size:18px">${cfg.icon}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-        <div style="font-size:11px;color:#aaa">${cfg.label}</div>
-      </div>
-      <div style="text-align:right">${ud.stars ? `<div style="color:#f39c12;font-size:13px">${ud.stars}★</div>` : ''}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:#aaa">${cfg.label}</div></div>
+      <div>${ud.stars ? `<div style="color:#f39c12;font-size:13px">${ud.stars}★</div>` : ''}</div>
     </div>`;
   }).join('');
 
   document.getElementById('sheet-content').innerHTML = `
-    <div class="sheet-header">
-      <div><div class="place-name">Mi guía personal</div></div>
-      <button class="close-btn" onclick="closeSheet()">✕</button>
-    </div>
+    <div class="sheet-header"><div><div class="place-name">Mi guía personal</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
     <div class="sheet-scroll">
       <div class="stats-grid">
-        <div class="stat-card" style="background:#eafaf1;color:#1e8449">
-          <div class="stat-num">${visited.length}</div>
-          <div class="stat-label">Visitados</div>
-        </div>
-        <div class="stat-card" style="background:#fef9e7;color:#d35400">
-          <div class="stat-num">${pending.length}</div>
-          <div class="stat-label">Pendientes</div>
-        </div>
+        <div class="stat-card" style="background:#eafaf1;color:#1e8449"><div class="stat-num">${visited.length}</div><div class="stat-label">Visitados</div></div>
+        <div class="stat-card" style="background:#fef9e7;color:#d35400"><div class="stat-num">${pending.length}</div><div class="stat-label">Pendientes</div></div>
       </div>
       <div class="section-title">Lista de visitados</div>
       ${visitedList || '<div style="text-align:center;padding:20px;color:#aaa">No has visitado nada aún</div>'}
@@ -477,8 +426,7 @@ function showStats() {
 
 function showToast(msg) {
   const el = document.createElement('div');
-  el.className = 'map-toast';
-  el.textContent = msg;
+  el.className = 'map-toast'; el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2500);
 }
