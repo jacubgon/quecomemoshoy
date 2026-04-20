@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sevilla Gastronómica</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f0eb}
+        #app{display:flex;flex-direction:column;height:100%}
+        #map{flex:1;z-index:1;min-height:0}
+
+        .top-bar{background:#fff;padding:10px 14px 8px;border-bottom:1px solid #e8e0d8;z-index:10}
+        .app-title{font-size:16px;font-weight:700;color:#1a1a1a;letter-spacing:-0.3px}
+        .app-sub{font-size:11px;color:#999;margin-top:1px}
+        .top-row{display:flex;justify-content:space-between;align-items:center}
+        .my-list-btn{font-size:12px;color:#c0392b;font-weight:600;cursor:pointer;padding:4px 0}
+
+        .filters{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 6px;scrollbar-width:none;background:#fff;border-bottom:1px solid #e8e0d8;z-index:10}
+        .filters::-webkit-scrollbar{display:none}
+        .filter-btn{flex-shrink:0;padding:5px 12px;border-radius:20px;border:1px solid #ddd;background:#fff;font-size:12px;cursor:pointer;white-space:nowrap;color:#555;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+        .filter-btn.active{background:#c0392b;border-color:#c0392b;color:#fff;font-weight:500}
+
+        /* BOTTOM SHEET */
+        .bottom-sheet{position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;z-index:1000;transform:translateY(100%);transition:transform 0.32s cubic-bezier(.4,0,.2,1);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 -6px 32px rgba(0,0,0,0.15)}
+        .bottom-sheet.open{transform:translateY(0)}
+        .sheet-handle-wrap{padding:10px 0 0;display:flex;justify-content:center;flex-shrink:0}
+        .sheet-handle{width:40px;height:4px;background:#e0d9d0;border-radius:2px}
+        .sheet-header{padding:10px 16px 10px;border-bottom:1px solid #f0ece8;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+        .sheet-scroll{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:14px 16px 40px}
+
+        .place-name{font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.2;padding-right:8px}
+        .place-type-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-top:5px}
+        .place-address{font-size:12px;color:#aaa;margin-top:3px}
+        .close-btn{width:30px;height:30px;border-radius:50%;background:#f0ece8;border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#666;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+
+        .section-title{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.6px;margin:14px 0 8px}
+
+        .stars-row{display:flex;align-items:center;gap:10px;margin:4px 0 2px}
+        .stars{display:flex;gap:4px}
+        .star{font-size:28px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent;transition:transform 0.1s}
+        .star:active{transform:scale(1.3)}
+        .star.filled{color:#f39c12}
+        .star.empty{color:#e0dbd5}
+        .rating-label{font-size:13px;color:#aaa}
+
+        .status-row{display:flex;gap:8px;margin-bottom:4px}
+        .status-btn{flex:1;padding:9px;border:1px solid #e0d9d0;border-radius:10px;background:#fff;font-size:13px;cursor:pointer;text-align:center;color:#555;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+        .status-btn.active-visited{background:#27ae60;border-color:#27ae60;color:#fff;font-weight:600}
+        .status-btn.active-pending{background:#e67e22;border-color:#e67e22;color:#fff;font-weight:600}
+
+        .price-row{display:flex;gap:6px;margin-bottom:4px}
+        .price-btn{flex:1;padding:8px;border:1px solid #e0d9d0;border-radius:10px;background:#fff;font-size:14px;cursor:pointer;text-align:center;color:#555;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+        .price-btn.active{background:#27ae60;border-color:#27ae60;color:#fff;font-weight:700}
+
+        .tag-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
+        .tag{padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;border:1px solid #e0d9d0;background:#faf8f5;color:#555;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+        .tag.active{background:#2c3e50;border-color:#2c3e50;color:#fff}
+
+        .notes-input{width:100%;border:1px solid #e0d9d0;border-radius:12px;padding:10px 12px;font-size:14px;resize:none;font-family:inherit;color:#333;background:#faf8f5;outline:none;min-height:70px;-webkit-appearance:none}
+        .notes-input:focus{border-color:#aaa;background:#fff}
+
+        .save-btn{width:100%;padding:14px;background:#c0392b;border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;-webkit-tap-highlight-color:transparent}
+        .save-btn:active{opacity:0.85}
+
+        .google-bar{display:flex;align-items:center;gap:8px;background:#faf8f5;border-radius:10px;padding:8px 12px;margin-bottom:4px}
+        .google-stars{color:#f39c12;letter-spacing:1px;font-size:14px}
+        .google-num{font-size:14px;font-weight:700;color:#333}
+        .google-count{font-size:12px;color:#aaa}
+
+        /* FABs */
+        .fab-add{position:fixed;bottom:24px;right:18px;width:54px;height:54px;background:#c0392b;border-radius:50%;border:none;box-shadow:0 4px 14px rgba(192,57,43,0.45);font-size:26px;color:#fff;z-index:500;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform 0.15s;cursor:pointer}
+        .fab-add:active{transform:scale(0.93)}
+        .fab-loc{position:fixed;bottom:24px;left:18px;width:48px;height:48px;background:#fff;border-radius:50%;border:1px solid #ddd;box-shadow:0 2px 10px rgba(0,0,0,0.14);font-size:20px;z-index:500;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;cursor:pointer}
+
+        .map-toast{background:rgba(44,62,80,0.92);color:#fff;border-radius:12px;padding:11px 18px;font-size:14px;position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2000;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.25);pointer-events:none}
+
+        /* ADD FORM */
+        .add-form-wrap{padding:4px 16px 40px}
+        .add-form-wrap label{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;display:block;margin:12px 0 5px}
+        .add-form-wrap input,.add-form-wrap select{width:100%;border:1px solid #e0d9d0;border-radius:12px;padding:10px 13px;font-size:15px;font-family:inherit;color:#333;background:#faf8f5;-webkit-appearance:none;appearance:none;outline:none}
+        .add-form-wrap input:focus,.add-form-wrap select:focus{border-color:#aaa;background:#fff}
+
+        /* STATS */
+        .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+        .stat-card{border-radius:14px;padding:14px 12px;text-align:center}
+        .stat-num{font-size:28px;font-weight:800;line-height:1}
+        .stat-label{font-size:12px;margin-top:4px;opacity:0.75}
+        .visited-item{padding:10px 0;border-bottom:1px solid #f5f0eb;display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:8px}
+        .visited-item:last-child{border-bottom:none}
+
+        /* OVERLAY */
+        .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:999;display:none}
+        .overlay.show{display:block}
+    </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="top-bar">
+    <div class="top-row">
+      <div>
+        <div class="app-title">🍷 Sevilla Gastronómica</div>
+        <div class="app-sub" id="count-label">Cargando...</div>
+      </div>
+      <div class="my-list-btn" onclick="showStats()">Mi lista ›</div>
+    </div>
+  </div>
+  <div class="filters" id="filters">
+    <button class="filter-btn active" onclick="filterBy('todos',this)">Todos</button>
+    <button class="filter-btn" onclick="filterBy('tapas',this)">🍤 Tapas</button>
+    <button class="filter-btn" onclick="filterBy('restaurante',this)">🍽️ Restaurante</button>
+    <button class="filter-btn" onclick="filterBy('cafeteria',this)">☕ Cafetería</button>
+    <button class="filter-btn" onclick="filterBy('copas',this)">🍸 Copas</button>
+    <button class="filter-btn" onclick="filterBy('bar',this)">🍺 Bar</button>
+    <button class="filter-btn" onclick="filterBy('pendiente',this)">⭐ Pendientes</button>
+    <button class="filter-btn" onclick="filterBy('visitado',this)">✅ Visitados</button>
+  </div>
+  <div id="map"></div>
+</div>
+
+<button class="fab-add" onclick="startAddMode()" title="Añadir sitio">+</button>
+<button class="fab-loc" onclick="goToMyLocation()" title="Mi ubicación">📍</button>
+
+<div class="overlay" id="overlay" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="sheet">
+  <div class="sheet-handle-wrap"><div class="sheet-handle"></div></div>
+  <div id="sheet-content"></div>
+</div>
+
+<script>
+const PLACES = [
+  {id:1,name:"La Bartola",type:"tapas",lat:37.3869,lng:-5.9880,google_rating:4.6,google_count:6038,price_level:1,address:"C. San José, 24"},
+  {id:2,name:"Bar Alfalfa",type:"tapas",lat:37.3900,lng:-5.9901,google_rating:4.6,google_count:7597,price_level:1,address:"C. Candilejo, 1"},
+  {id:3,name:"Bodega Santa Cruz",type:"tapas",lat:37.3860,lng:-5.9908,google_rating:4.4,google_count:15483,price_level:1,address:"C. Rodrigo Caro, 1"},
+  {id:4,name:"Islamorada",type:"tapas",lat:37.3856,lng:-5.9958,google_rating:4.7,google_count:4277,price_level:2,address:"C. Francisco López Bordas"},
+  {id:5,name:"Los Coloniales",type:"restaurante",lat:37.3915,lng:-5.9895,google_rating:4.3,google_count:7070,price_level:1,address:"Pl. Cristo de Burgos, 19"},
+  {id:6,name:"Malasaña Triana",type:"restaurante",lat:37.3802,lng:-6.0036,google_rating:4.8,google_count:5563,price_level:2,address:"C. Trabajo, 4"},
+  {id:7,name:"Abades Triana",type:"restaurante",lat:37.3817,lng:-5.9980,google_rating:4.3,google_count:4870,price_level:3,address:"C. Betis, 69"},
+  {id:8,name:"El Sella",type:"restaurante",lat:37.3848,lng:-6.0027,google_rating:4.7,google_count:5086,price_level:2,address:"C. Pureza, 4"},
+  {id:9,name:"MaríaTrifulca",type:"restaurante",lat:37.3857,lng:-6.0025,google_rating:4.1,google_count:6877,price_level:3,address:"Pl. del Altozano, 1"},
+  {id:10,name:"Virgen Coffee",type:"cafeteria",lat:37.3940,lng:-5.9918,google_rating:4.9,google_count:717,price_level:1,address:"C. Regina, 1"},
+  {id:11,name:"Jester Coffee",type:"cafeteria",lat:37.3858,lng:-5.9863,google_rating:4.5,google_count:2812,price_level:2,address:"C. Puerta de la Carne, 7a"},
+  {id:12,name:"MUY Coffee",type:"cafeteria",lat:37.3974,lng:-5.9927,google_rating:4.9,google_count:1422,price_level:1,address:"Correduría, 14"},
+  {id:13,name:"The Second Room",type:"copas",lat:37.3873,lng:-5.9924,google_rating:4.5,google_count:1156,price_level:2,address:"C. de Placentines, 19"},
+  {id:14,name:"Premier Garden Bar",type:"copas",lat:37.3795,lng:-5.9878,google_rating:4.3,google_count:2954,price_level:2,address:"Prado de San Sebastián"},
+  {id:15,name:"Le XiX",type:"copas",lat:37.3842,lng:-5.9943,google_rating:4.5,google_count:1822,price_level:2,address:"C. Tomás de Ibarra, 9"}
+];
+
+const TYPE_CFG = {
+  tapas: {color:'#c0392b',icon:'🍤',label:'Tapas'},
+  restaurante:{color:'#8e44ad',icon:'🍽️',label:'Restaurante'},
+  cafeteria: {color:'#d35400',icon:'☕',label:'Cafetería'},
+  copas: {color:'#2980b9',icon:'🍸',label:'Copas'},
+  bar: {color:'#16a085',icon:'🍺',label:'Bar'},
+  otro: {color:'#7f8c8d',icon:'📍',label:'Otro'}
+};
+const TAGS = ['Buenísimo el jamón','Gran ambiente','Buena relación calidad-precio','Muy auténtico','Ideal para grupos','Terraza genial','Para una cita','Producto de calidad','Raciones generosas','Buen vino','Trato excelente'];
+
+let userData = {};
+let customPlaces = [];
+let nextId = 200;
+let allPlaces = [];
+let markers = {};
+let currentFilter = 'todos';
+let addMode = false;
+let currentPlace = null;
+let map, userMarker;
+
+// Load storage
+try {
+  const ud = localStorage.getItem('sev_ud');
+  if(ud) userData = JSON.parse(ud);
+  const cp = localStorage.getItem('sev_cp');
+  if(cp) { customPlaces = JSON.parse(cp); nextId = 200 + customPlaces.length; }
+} catch(e){}
+
+function save() {
+  localStorage.setItem('sev_ud', JSON.stringify(userData));
+  localStorage.setItem('sev_cp', JSON.stringify(customPlaces));
+}
+
+function u(id) { return userData[id] || {}; }
+
+function initMap() {
+  allPlaces = [...PLACES, ...customPlaces];
+  map = L.map('map', {zoomControl: false, tap: true}).setView([37.3890, -5.9940], 15);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© CARTO',
+    maxZoom: 19
+  }).addTo(map);
+  L.control.zoom({position:'topright'}).addTo(map);
+  map.on('click', onMapClick);
+  renderMarkers();
+}
+
+function makeIcon(p) {
+  const ud = u(p.id);
+  const cfg = TYPE_CFG[p.type] || TYPE_CFG.otro;
+  const bg = ud.status === 'visitado' ? '#27ae60' : ud.status === 'pendiente' ? '#e67e22' : cfg.color;
+  const starBadge = ud.stars > 0 ? `<div style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:#f39c12;color:#fff;border-radius:6px;font-size:9px;font-weight:800;padding:1px 4px;white-space:nowrap;line-height:1.4">${ud.stars}★</div>` : '';
+  const html = `<div style="position:relative;width:38px;height:38px">
+    <div style="background:${bg};width:38px;height:38px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,0.28)">${cfg.icon}</div>
+    ${starBadge}
+  </div>`;
+  return L.divIcon({html, className:'', iconSize:[38,38], iconAnchor:[19,19]});
+}
+
+function renderMarkers() {
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
+  const filtered = getFiltered();
+  filtered.forEach(p => {
+    const m = L.marker([p.lat, p.lng], {icon: makeIcon(p)}).addTo(map);
+    m.on('click', () => openSheet(p));
+    markers[p.id] = m;
+  });
+  document.getElementById('count-label').textContent = `${filtered.length} sitios en el mapa`;
+}
+
+function getFiltered() {
+  return allPlaces.filter(p => {
+    if (currentFilter === 'todos') return true;
+    if (currentFilter === 'pendiente') return u(p.id).status === 'pendiente';
+    if (currentFilter === 'visitado') return u(p.id).status === 'visitado';
+    return p.type === currentFilter;
+  });
+}
+
+function filterBy(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMarkers();
+}
+
+/**
+ * ESTA ES LA FUNCIÓN QUE TENÍA EL ERROR. 
+ * Ahora se divide en:
+ * 1. openSheet (Controlador: busca el sitio por ID o lo recibe directo)
+ * 2. renderSheetContent (Lógica: pinta el HTML)
+ */
+function openSheet(placeOrId) {
+  const place = typeof placeOrId === 'number' ? allPlaces.find(p => p.id === placeOrId) : placeOrId;
+  if (!place) return;
+  renderSheetContent(place);
+}
+
+function renderSheetContent(place) {
+  currentPlace = place;
+  const ud = u(place.id);
+  const cfg = TYPE_CFG[place.type] || TYPE_CFG.otro;
+
+  const starsHtml = [1,2,3,4,5].map(i =>
+    `<span class="star ${(ud.stars||0) >= i ? 'filled' : 'empty'}" onclick="setStar(${i})">★</span>`
+  ).join('');
+
+  const tagsHtml = TAGS.map(t => {
+    const active = (ud.tags||[]).includes(t);
+    return `<span class="tag ${active ? 'active' : ''}" onclick="toggleTag('${t.replace(/'/g,"\\'")}',this)">${t}</span>`;
+  }).join('');
+
+  const priceLabels = ['€','€€','€€€','€€€€'];
+  const priceHtml = priceLabels.map((l,i) =>
+    `<button class="price-btn ${(ud.price_quality||0) === i+1 ? 'active' : ''}" onclick="setPrice(${i+1},this)">${l}</button>`
+  ).join('');
+
+  const gRating = place.google_rating;
+  const gStars = gRating ? '★'.repeat(Math.round(gRating)) + '☆'.repeat(5-Math.round(gRating)) : '';
+
+  document.getElementById('sheet-content').innerHTML = `
+    <div class="sheet-header">
+      <div style="flex:1;min-width:0">
+        <div class="place-name">${place.name}</div>
+        <span class="place-type-badge" style="background:${cfg.color}22;color:${cfg.color}">${cfg.icon} ${cfg.label}</span>
+        <div class="place-address">${place.address || ''}</div>
+      </div>
+      <button class="close-btn" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="sheet-scroll">
+      ${gRating ? `
+        <div class="google-bar">
+          <span style="font-size:12px;color:#aaa">Google</span>
+          <span class="google-stars">${gStars}</span>
+          <span class="google-num">${gRating}</span>
+          <span class="google-count">(${place.google_count?.toLocaleString('es')})</span>
+        </div>` : ''}
+
+      <div class="section-title">Mi valoración</div>
+      <div class="stars-row">
+        <div class="stars">${starsHtml}</div>
+        <span class="rating-label" id="star-label">${ud.stars ? ud.stars + ' estrellas' : 'Sin valorar'}</span>
+      </div>
+
+      <div class="section-title">Estado</div>
+      <div class="status-row">
+        <button class="status-btn ${ud.status === 'visitado' ? 'active-visited' : ''}" onclick="setStatus('visitado',this)">✅ Ya he ido</button>
+        <button class="status-btn ${ud.status === 'pendiente' ? 'active-pending' : ''}" onclick="setStatus('pendiente',this)">⭐ Quiero ir</button>
+      </div>
+
+      <div class="section-title">Precio</div>
+      <div class="price-row">${priceHtml}</div>
+
+      <div class="section-title">Etiquetas</div>
+      <div class="tag-row">${tagsHtml}</div>
+
+      <div class="section-title">Mis notas</div>
+      <textarea class="notes-input" id="notes-input" placeholder="Ej: Buenísimo el jamón...">${ud.notes || ''}</textarea>
+
+      <button class="save-btn" onclick="savePlace()">💾 Guardar</button>
+      ${place.custom ? `<button class="save-btn" style="background:#e74c3c;margin-top:8px" onclick="deletePlace(${place.id})">🗑️ Eliminar</button>` : ''}
+    </div>
+  `;
+
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+  currentPlace = null;
+}
+
+function setStar(n) {
+  if (!currentPlace) return;
+  userData[currentPlace.id] = {...u(currentPlace.id), stars: n};
+  document.querySelectorAll('.star').forEach((s, i) => {
+    s.className = 'star ' + (i < n ? 'filled' : 'empty');
+  });
+  document.getElementById('star-label').textContent = n + ' estrellas';
+}
+
+function setStatus(s, btn) {
+  if (!currentPlace) return;
+  const already = u(currentPlace.id).status === s;
+  userData[currentPlace.id] = {...u(currentPlace.id), status: already ? null : s};
+  document.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
+  if (!already) btn.className = 'status-btn ' + (s === 'visitado' ? 'active-visited' : 'active-pending');
+}
+
+function setPrice(n, btn) {
+  if (!currentPlace) return;
+  userData[currentPlace.id] = {...u(currentPlace.id), price_quality: n};
+  document.querySelectorAll('.price-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function toggleTag(tag, el) {
+  if (!currentPlace) return;
+  const tags = [...(u(currentPlace.id).tags || [])];
+  const idx = tags.indexOf(tag);
+  if (idx > -1) tags.splice(idx, 1); else tags.push(tag);
+  userData[currentPlace.id] = {...u(currentPlace.id), tags};
+  el.classList.toggle('active');
+}
+
+function savePlace() {
+  if (!currentPlace) return;
+  const notes = document.getElementById('notes-input').value;
+  userData[currentPlace.id] = {...u(currentPlace.id), notes};
+  save();
+  renderMarkers();
+  closeSheet();
+  showToast('¡Guardado!');
+}
+
+function deletePlace(id) {
+  if (!confirm('¿Eliminar este sitio?')) return;
+  customPlaces = customPlaces.filter(p => p.id !== id);
+  allPlaces = allPlaces.filter(p => p.id !== id);
+  save();
+  closeSheet();
+  renderMarkers();
+}
+
+function startAddMode() {
+  addMode = true;
+  map.getContainer().style.cursor = 'crosshair';
+  showToast('Toca el mapa para situarlo');
+}
+
+function onMapClick(e) {
+  if (!addMode) return;
+  addMode = false;
+  map.getContainer().style.cursor = '';
+  showAddForm(e.latlng.lat, e.latlng.lng);
+}
+
+function showAddForm(lat, lng) {
+  const typeOpts = Object.entries(TYPE_CFG).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+  document.getElementById('sheet-content').innerHTML = `
+    <div class="sheet-header">
+      <div><div class="place-name">Añadir sitio</div></div>
+      <button class="close-btn" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="add-form-wrap">
+      <label>Nombre del sitio</label>
+      <input id="new-name" type="text" placeholder="Ej: Casa Morales" autocomplete="off">
+      <label>Tipo</label>
+      <select id="new-type">${typeOpts}</select>
+      <label>Dirección</label>
+      <input id="new-addr" type="text" placeholder="Opcional" autocomplete="off">
+      <button class="save-btn" onclick="confirmAdd(${lat},${lng})">➕ Añadir</button>
+    </div>
+  `;
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function confirmAdd(lat, lng) {
+  const name = document.getElementById('new-name').value.trim();
+  if (!name) return;
+  const type = document.getElementById('new-type').value;
+  const addr = document.getElementById('new-addr').value.trim();
+  const place = {id: nextId++, name, type, lat, lng, address: addr || 'Añadido por ti', custom: true};
+  customPlaces.push(place);
+  allPlaces.push(place);
+  save();
+  closeSheet();
+  renderMarkers();
+  setTimeout(() => openSheet(place), 400);
+}
+
+function goToMyLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    const {latitude: lat, longitude: lng} = pos.coords;
+    map.setView([lat, lng], 17);
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: '#3498db', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+  });
+}
+
+function showStats() {
+  const visited = allPlaces.filter(p => u(p.id).status === 'visitado');
+  const pending = allPlaces.filter(p => u(p.id).status === 'pendiente');
+
+  const visitedList = visited.map(p => {
+    const ud = u(p.id);
+    const cfg = TYPE_CFG[p.type] || TYPE_CFG.otro;
+    return `<div class="visited-item" onclick="openSheet(${p.id})">
+      <span style="font-size:18px">${cfg.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:11px;color:#aaa">${cfg.label}</div>
+      </div>
+      <div style="text-align:right">${ud.stars ? `<div style="color:#f39c12;font-size:13px">${ud.stars}★</div>` : ''}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sheet-content').innerHTML = `
+    <div class="sheet-header">
+      <div><div class="place-name">Mi guía personal</div></div>
+      <button class="close-btn" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="sheet-scroll">
+      <div class="stats-grid">
+        <div class="stat-card" style="background:#eafaf1;color:#1e8449">
+          <div class="stat-num">${visited.length}</div>
+          <div class="stat-label">Visitados</div>
+        </div>
+        <div class="stat-card" style="background:#fef9e7;color:#d35400">
+          <div class="stat-num">${pending.length}</div>
+          <div class="stat-label">Pendientes</div>
+        </div>
+      </div>
+      <div class="section-title">Lista de visitados</div>
+      ${visitedList || '<div style="text-align:center;padding:20px;color:#aaa">No has visitado nada aún</div>'}
+    </div>
+  `;
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'map-toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+window.addEventListener('load', initMap);
+</script>
+</body>
+</html>
