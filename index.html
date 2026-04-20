@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sevilla Gastronómica</title>
+    <title>Que comemos hoy?</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -275,13 +275,13 @@ function onMapClick(e) {
 function showAddForm(lat, lng) {
     const typeOpts = Object.entries(TYPE_CFG).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
     document.getElementById('sheet-content').innerHTML = `
-        <div class="sheet-header"><div><div class="place-name">Añadir sitio global</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
+        <div class="sheet-header"><div><div class="place-name">Añadir sitio</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
         <div class="sheet-scroll">
             <div class="add-form-wrap">
                 <label>Nombre del sitio</label><input id="new-name" type="text" placeholder="Ej: Casa Morales" autocomplete="off">
                 <label>Tipo</label><select id="new-type">${typeOpts}</select>
                 <label>Dirección</label><input id="new-addr" type="text" placeholder="Opcional" autocomplete="off">
-                <button class="save-btn" onclick="confirmAdd(${lat},${lng})">🌍 Compartir con todos</button>
+                <button class="save-btn" onclick="confirmAdd(${lat},${lng})">Guardar</button>
             </div>
         </div>
     `;
@@ -356,8 +356,8 @@ function showStats() {
         <div class="sheet-header"><div><div class="place-name">Mi guía personal</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
         <div class="sheet-scroll">
             <div class="stats-grid">
-                <div class="stat-card" style="background:#eafaf1;color:#1e8449"><div class="stat-num">${visited.length}</div><div class="stat-label">Visitados</div></div>
-                <div class="stat-card" style="background:#fef9e7;color:#d35400"><div class="stat-num">${pending.length}</div><div class="stat-label">Pendientes</div></div>
+                <div class="stat-card" style="background:#eafaf1;color:#1e8449;display:flex;gap:10px;border-radius:6px;padding: 5px 10px"><div class="stat-num">${visited.length}</div><div class="stat-label">Visitados</div></div>
+                <div class="stat-card" style="background:#fef9e7;color:#d35400;display:flex;gap:10px;border-radius:6px;padding: 5px 10px; margin-top:10px"><div class="stat-num">${pending.length}</div><div class="stat-label">Pendientes</div></div>
             </div>
             <div class="section-title">Lista de visitados</div>
             ${visitedList || '<div style="text-align:center;padding:20px;color:#aaa">No has visitado nada aún</div>'}
