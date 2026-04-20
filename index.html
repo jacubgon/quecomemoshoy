@@ -267,7 +267,7 @@ function saveLocal() {
 function u(id) { return userData[id] || {}; }
 
 async function initMap() {
-    map = L.map('map', {zoomControl: false, tap: true}).setView([37.3890, -5.9940], 15);
+    map = L.map('map', {zoomControl: false, tap: true}).setView([37.3890, -5.9940], 14);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '© CARTO',
         maxZoom: 19
