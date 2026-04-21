@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDEbEzcYp6G_PhRew5b5B4OUBvRNlHxm7g&libraries=places"></script>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         /* Aplicamos la nueva tipografía */
@@ -201,6 +202,29 @@
         .leaflet-top.leaflet-right {
                 top: 150px !important; /* Baja el zoom para que no lo tape la barra */
             }
+        /* Estilo para el autocompletado de Google */
+.pac-container {
+    border-radius: 15px;
+    margin-top: 5px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    border: none;
+    font-family: 'Outfit', sans-serif;
+    z-index: 2000 !important; /* Para que salga por encima del modal */
+}
+
+.pac-item {
+    padding: 10px;
+    cursor: pointer;
+}
+
+.pac-item:hover {
+    background-color: #fafafa;
+}
+
+.pac-item-query {
+    font-size: 14px;
+    color: #333;
+}
     </style>
 </head>
 <body>
@@ -378,10 +402,14 @@ function savePlace() {
     showToast('¡Guardado en tu lista!');
 }
 
+// function startAddMode() {
+//     addMode = true;
+//     map.getContainer().style.cursor = 'crosshair';
+//     showToast('Toca el mapa para situarlo');
+// }
+
 function startAddMode() {
-    addMode = true;
-    map.getContainer().style.cursor = 'crosshair';
-    showToast('Toca el mapa para situarlo');
+    showAddForm();
 }
 
 function onMapClick(e) {
@@ -391,21 +419,125 @@ function onMapClick(e) {
     showAddForm(e.latlng.lat, e.latlng.lng);
 }
 
-function showAddForm(lat, lng) {
+// function showAddForm(lat, lng) {
+//     const typeOpts = Object.entries(TYPE_CFG).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+//     document.getElementById('sheet-content').innerHTML = `
+//         <div class="sheet-header"><div><div class="place-name">Añadir sitio</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
+//         <div class="sheet-scroll">
+//             <div class="add-form-wrap">
+//                 <label>Nombre del sitio</label><input id="new-name" type="text" placeholder="Ej: Casa Morales" autocomplete="off">
+//                 <label>Tipo</label><select id="new-type">${typeOpts}</select>
+//                 <label>Dirección</label><input id="new-addr" type="text" placeholder="Opcional" autocomplete="off">
+//                 <button class="save-btn" onclick="confirmAdd(${lat},${lng})">Guardar</button>
+//             </div>
+//         </div>
+//     `;
+//     document.getElementById('sheet').classList.add('open');
+//     document.getElementById('overlay').classList.add('show');
+// }
+
+function showAddForm() {
     const typeOpts = Object.entries(TYPE_CFG).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+    
     document.getElementById('sheet-content').innerHTML = `
-        <div class="sheet-header"><div><div class="place-name">Añadir sitio</div></div><button class="close-btn" onclick="closeSheet()">✕</button></div>
+        <div class="sheet-header">
+            <div><div class="place-name">Añadir nuevo sitio</div></div>
+            <button class="close-btn" onclick="closeSheet()">✕</button>
+        </div>
         <div class="sheet-scroll">
             <div class="add-form-wrap">
-                <label>Nombre del sitio</label><input id="new-name" type="text" placeholder="Ej: Casa Morales" autocomplete="off">
-                <label>Tipo</label><select id="new-type">${typeOpts}</select>
-                <label>Dirección</label><input id="new-addr" type="text" placeholder="Opcional" autocomplete="off">
-                <button class="save-btn" onclick="confirmAdd(${lat},${lng})">Guardar</button>
+                <label>Busca el nombre o la dirección</label>
+                <input id="google-search" type="text" placeholder="Ej: Bar Adrián o Calle Zaragoza..." 
+                       style="border: 1px solid rgba(230, 74, 25, 0.2); background: rgba(255,255,255,0.8); padding: 12px; font-family: inherit;">
+                
+                <div id="search-status" style="display:none; font-size:12px; color:#27ae60; margin: 8px 0; font-weight:700;">
+                    ✨ Ubicación encontrada con éxito
+                </div>
+
+                <label>Categoría</label>
+                <select id="new-type" style="margin-bottom:15px; font-family: inherit;">${typeOpts}</select>
+                
+                <label>Dirección detectada</label>
+                <input id="new-addr" type="text" readonly style="background: rgba(0,0,0,0.05); border:none; color:#777; font-family: inherit;">
+                
+                <button class="save-btn" id="confirm-btn-real" disabled style="opacity: 0.5; background: #E64A19;">
+                    Confirmar y añadir al mapa
+                </button>
             </div>
         </div>
     `;
+    
     document.getElementById('sheet').classList.add('open');
     document.getElementById('overlay').classList.add('show');
+
+    const input = document.getElementById('google-search');
+    const options = {
+        componentRestrictions: { country: "es" },
+        location: new google.maps.LatLng(37.3890, -5.9940),
+        radius: 10000,
+        fields: ["name", "formatted_address", "geometry", "types"]
+    };
+
+    const autocomplete = new google.maps.places.Autocomplete(input, options);
+    let selectedData = null;
+
+    // Cuando el usuario elige un sitio de la lista de Google
+    autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        
+        if (place.geometry) {
+            selectedData = {
+                name: place.name,
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+                address: place.formatted_address
+            };
+
+            document.getElementById('new-addr').value = place.formatted_address;
+            document.getElementById('search-status').style.display = 'block';
+            
+            // Activamos el botón
+            const btn = document.getElementById('confirm-btn-real');
+            btn.disabled = false;
+            btn.style.opacity = '1';
+
+            map.flyTo([selectedData.lat, selectedData.lng], 17);
+
+            const gTypes = place.types || [];
+            if (gTypes.includes('cafe')) document.getElementById('new-type').value = 'cafeteria';
+            else if (gTypes.includes('restaurant')) document.getElementById('new-type').value = 'restaurante';
+            else if (gTypes.includes('bar')) document.getElementById('new-type').value = 'bar';
+        }
+    });
+
+    // --- LA SOLUCIÓN: EventListener directo al botón ---
+    document.getElementById('confirm-btn-real').addEventListener('click', async () => {
+        if (!selectedData) return;
+        
+        const type = document.getElementById('new-type').value;
+        const btn = document.getElementById('confirm-btn-real');
+        
+        btn.innerText = "Guardando...";
+        btn.disabled = true;
+
+        const { error } = await _supabase.from('locales').insert([{
+            name: selectedData.name,
+            type: type,
+            lat: selectedData.lat,
+            lng: selectedData.lng,
+            address: selectedData.address
+        }]);
+
+        if (!error) {
+            showToast('¡Añadido con éxito!');
+            closeSheet();
+            await loadData(); // Refresca los pines en el mapa
+        } else {
+            alert("Error al guardar: " + error.message);
+            btn.innerText = "Confirmar y añadir al mapa";
+            btn.disabled = false;
+        }
+    });
 }
 
 async function confirmAdd(lat, lng) {
